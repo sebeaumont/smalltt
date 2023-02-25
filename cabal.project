@@ -1,0 +1,21 @@
+packages: .
+
+source-repository-package
+    type: git
+    location: https://github.com/AndrasKovacs/flatparse.git
+    tag: 3dce207dcbff2daa8ad667dce1c3b823e9a25295
+
+source-repository-package
+    type: git
+    location: https://github.com/AndrasKovacs/dynamic-array.git
+    tag: a9880641ddc174db68c7e4735742e763d910453e
+
+source-repository-package
+    type: git
+    location: https://github.com/AndrasKovacs/primdata.git
+    tag: 46b257c41a9eb0ad99ac1cd8c5dda029601089f5
+
+source-repository-package
+    type: git
+    location: https://github.com/AndrasKovacs/ghc-strict-implicit-params.git
+    tag: 215e0353374a61c0f8790371e4826b247c69580f
