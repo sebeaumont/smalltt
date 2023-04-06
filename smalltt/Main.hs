@@ -38,6 +38,29 @@ data State = State {
   , topCxt :: Top.Cxt
   }
 
+parseContents :: FilePath -> Src -> IO (Maybe State)
+parseContents path src = do
+  timedPure (parse src) >>= \case
+    (Err e, _) -> do
+      putStrLn (path ++ ":")
+      putStrLn (prettyError src e)
+      pure Nothing
+    (Fail, _) -> do
+      putStrLn "unknown parse error"
+      pure Nothing
+    (OK top _ _, time) -> do
+      putStrLn (path ++ " parsed in " ++ show time)
+      timed (elab src top) >>= \case
+        (Left e, _) -> do
+          putStrLn (showException src e)
+          pure Nothing
+        (Right topCxt, time) -> do
+          putStrLn (path ++ " elaborated in " ++ show time)
+          metas <- MC.size (Top.mcxt topCxt)
+          putStrLn ("created " ++ show metas ++ " metavariables")
+          putStrLn ("loaded " ++ show (Top.lvl topCxt) ++ " definitions")
+          pure (Just (State path src topCxt))
+
 load :: FilePath -> IO (Maybe State)
 load path = do
   (res, time) <- timed $
@@ -45,27 +68,8 @@ load path = do
       Left (e :: Ex.SomeException) -> do
         putStrLn (Ex.displayException e)
         pure Nothing
-      Right src -> do
-        timedPure (parse src) >>= \case
-          (Err e, _) -> do
-            putStrLn (path ++ ":")
-            putStrLn (prettyError src e)
-            pure Nothing
-          (Fail, _) -> do
-            putStrLn "unknown parse error"
-            pure Nothing
-          (OK top _ _, time) -> do
-            putStrLn (path ++ " parsed in " ++ show time)
-            timed (elab src top) >>= \case
-              (Left e, _) -> do
-                putStrLn (showException src e)
-                pure Nothing
-              (Right topCxt, time) -> do
-                putStrLn (path ++ " elaborated in " ++ show time)
-                metas <- MC.size (Top.mcxt topCxt)
-                putStrLn ("created " ++ show metas ++ " metavariables")
-                putStrLn ("loaded " ++ show (Top.lvl topCxt) ++ " definitions")
-                pure (Just (State path src topCxt))
+      Right src ->
+        parseContents path src
   putStrLn ("total load time: " ++ show time)
   pure res
 
@@ -83,7 +87,7 @@ loop st = do
           UJust (ST.Top a ga t _) -> do
             act st a t
           _ -> do
-            putStrLn "no such top-level name"
+            putStrLn ("no such top-level name: " <> str)
             loop (Just st)
       {-# inline loadTopDef #-}
 
@@ -203,7 +207,24 @@ loop st = do
       loop st
     ':':'q':_ -> do
       pure ()
+      
+    ':':'{':(dropSp -> rest) -> do
+      readS <- loopReader (rest <> "\n")
+      putStrLn ("|" <> readS <> "|")
+      st <- parseContents "<stdin>" (strToUtf8 readS)
+      loop st
+      
     _ -> do
       putStrLn "unknown command"
       putStrLn "use :? for help"
       loop st
+
+loopReader :: String -> IO String
+loopReader s = do
+  l <- getLine
+  case l of
+    ':':'}':_ ->
+      return s
+    str -> do
+      loopReader (s <> "\n" <> str)
+      
